@@ -1,6 +1,6 @@
 # Strategy Signal Board
 
-A simple educational web app for reviewing bullish stock strategies using recent Yahoo Finance data.
+A simple educational web app for reviewing bullish stock strategies using recent Yahoo Finance data. This app was vibecoded for my dad lol.
 
 The app reads daily and hourly candles, evaluates five Cardona-inspired setups, and shows:
 
@@ -79,6 +79,43 @@ Then open `http://localhost:3000`.
 npm run build
 npm start
 ```
+
+## Deploying to Vercel
+
+This project is designed to deploy on `Vercel`.
+
+### Why Vercel
+
+The app uses a server route at `app/api/analyze/route.ts` to fetch Yahoo Finance data and run the strategy engine. That means it needs a platform that can run Next.js server functionality, not just static files.
+
+### One-Time Setup
+
+1. Push this repository to GitHub.
+2. Go to `https://vercel.com`.
+3. Import `gabo0802/StockConverter`.
+4. Keep the detected framework as `Next.js`.
+5. Deploy.
+
+### Build Settings
+
+For this repo, the default Vercel settings should work:
+
+- Framework Preset: `Next.js`
+- Build Command: `npm run build`
+- Install Command: `npm install`
+- Output: managed automatically by Vercel
+
+The repo includes a minimal `vercel.json` so Vercel treats the project explicitly as a Next.js app.
+
+### After Deploy
+
+Vercel will give you a live URL such as:
+
+```text
+https://stock-converter-your-project.vercel.app
+```
+
+Each push to your main branch can automatically trigger a fresh deployment.
 
 ## Scripts
 
