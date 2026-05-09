@@ -87,6 +87,9 @@ describe("AnalyzerClient", () => {
     await waitFor(() => {
       expect(screen.getByText("PM 40 en Hora")).toBeInTheDocument();
     });
+
+    expect(screen.getByRole("button", { name: "MSFT" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "CMG" })).toBeInTheDocument();
   });
 
   it("lets the user inspect a different strategy and translate the UI", async () => {

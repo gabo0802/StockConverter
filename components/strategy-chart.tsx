@@ -11,7 +11,8 @@ import {
   type SeriesMarker,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { createPortal } from "react-dom";
 import type { ChartAnnotation, EnrichedCandle } from "@/lib/types";
 
 function toTimestamp(value: string): UTCTimestamp {
@@ -21,7 +22,7 @@ function toTimestamp(value: string): UTCTimestamp {
 function addMaSeries(chart: IChartApi, candles: EnrichedCandle[], accessor: (candle: EnrichedCandle) => number | null, color: string) {
   const series = chart.addSeries(LineSeries, {
     color,
-    lineWidth: 2,
+    lineWidth: 3,
     priceLineVisible: false,
     crosshairMarkerVisible: false,
   });
@@ -79,14 +80,18 @@ function addAnnotation(
   }
 }
 
-export function StrategyChart({
+function StrategyChartCanvas({
   candles,
   annotations,
   emptyLabel,
+  height,
+  chartRef,
 }: {
   candles: EnrichedCandle[] | null;
   annotations: ChartAnnotation[];
   emptyLabel: string;
+  height: number;
+  chartRef?: MutableRefObject<IChartApi | null>;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
@@ -106,14 +111,19 @@ export function StrategyChart({
         horzLines: { color: "rgba(148, 163, 184, 0.18)" },
       },
       width: hostRef.current.clientWidth,
-      height: 460,
+      height,
       timeScale: {
         borderColor: "rgba(148, 163, 184, 0.25)",
+        timeVisible: true,
+        secondsVisible: false,
       },
       rightPriceScale: {
         borderColor: "rgba(148, 163, 184, 0.25)",
       },
     });
+    if (chartRef) {
+      chartRef.current = chart;
+    }
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#16a34a",
@@ -133,8 +143,8 @@ export function StrategyChart({
       })),
     );
 
-    addMaSeries(chart, candles, (candle) => candle.ma20, "#14b8a6");
-    addMaSeries(chart, candles, (candle) => candle.ma40, "#22c55e");
+    addMaSeries(chart, candles, (candle) => candle.ma20, "#0f172a");
+    addMaSeries(chart, candles, (candle) => candle.ma40, "#d946ef");
     addMaSeries(chart, candles, (candle) => candle.ma100, "#f97316");
     addMaSeries(chart, candles, (candle) => candle.ma200, "#7c3aed");
 
@@ -156,13 +166,101 @@ export function StrategyChart({
     return () => {
       resizeObserver.disconnect();
       seriesMarkers.detach();
+      if (chartRef) {
+        chartRef.current = null;
+      }
       chart.remove();
     };
-  }, [annotations, candles]);
+  }, [annotations, candles, chartRef, height]);
 
   if (!candles) {
-    return <div ref={hostRef} style={{ height: "100%", minHeight: 460, padding: 24 }} className="muted">{emptyLabel}</div>;
+    return <div ref={hostRef} style={{ height: "100%", minHeight: height, padding: 24 }} className="muted">{emptyLabel}</div>;
   }
 
-  return <div ref={hostRef} style={{ height: "100%", minHeight: 460 }} />;
+  return <div ref={hostRef} style={{ height: "100%", minHeight: height }} />;
+}
+
+export function StrategyChart({
+  candles,
+  annotations,
+  emptyLabel,
+  expandLabel,
+  closeLabel,
+}: {
+  candles: EnrichedCandle[] | null;
+  annotations: ChartAnnotation[];
+  emptyLabel: string;
+  expandLabel: string;
+  closeLabel: string;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const baseChartRef = useRef<IChartApi | null>(null);
+  const modalChartRef = useRef<IChartApi | null>(null);
+
+  useEffect(() => {
+    if (!isExpanded) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isExpanded]);
+
+  function resetView(target: "base" | "modal") {
+    const chart = target === "base" ? baseChartRef.current : modalChartRef.current;
+    chart?.timeScale().fitContent();
+  }
+
+  function onChartDoubleClick(target: "base" | "modal") {
+    resetView(target);
+  }
+
+  return (
+    <>
+      <div className="chart-stage">
+        <div className="chart-controls">
+          <button className="chart-control-button" type="button" onClick={() => setIsExpanded(true)}>
+            {expandLabel}
+          </button>
+        </div>
+        <div className="chart-canvas-shell" onDoubleClick={() => onChartDoubleClick("base")}>
+          <StrategyChartCanvas
+            candles={candles}
+            annotations={annotations}
+            emptyLabel={emptyLabel}
+            height={460}
+            chartRef={baseChartRef}
+          />
+        </div>
+      </div>
+
+      {isExpanded && typeof document !== "undefined"
+        ? createPortal(
+            <div className="chart-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsExpanded(false)}>
+              <div className="chart-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="chart-modal-toolbar">
+                  <button className="chart-control-button" type="button" onClick={() => setIsExpanded(false)}>
+                    {closeLabel}
+                  </button>
+                </div>
+                <div className="chart-canvas-shell chart-canvas-expanded" onDoubleClick={() => onChartDoubleClick("modal")}>
+                  <StrategyChartCanvas
+                    candles={candles}
+                    annotations={annotations}
+                    emptyLabel={emptyLabel}
+                    height={720}
+                    chartRef={modalChartRef}
+                  />
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
 }

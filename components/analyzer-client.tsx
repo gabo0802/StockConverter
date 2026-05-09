@@ -4,7 +4,29 @@ import { useState } from "react";
 import type { AnalysisResponse, ChartAnnotation, SignalCheck, StrategyEvaluation, StrategyId } from "@/lib/types";
 import { StrategyChart } from "@/components/strategy-chart";
 
-const DEMO_SYMBOLS = ["SPY", "QQQ", "AAPL"];
+const DEMO_SYMBOLS = [
+  "SPY",
+  "QQQ",
+  "AAPL",
+  "MSFT",
+  "META",
+  "AMZN",
+  "NFLX",
+  "TSLA",
+  "NVDA",
+  "GOOGL",
+  "TNA",
+  "BAC",
+  "MRNA",
+  "GLD",
+  "SLV",
+  "USO",
+  "XOM",
+  "CVX",
+  "DIS",
+  "PYPL",
+  "CMG",
+];
 type Locale = "en" | "es";
 
 const COPY = {
@@ -37,6 +59,9 @@ const COPY = {
     chart: "Chart",
     chartHelp: "Hourly candlesticks with moving averages and setup annotations.",
     chartEmpty: "Run an analysis to render the hourly chart.",
+    chartReset: "Reset view",
+    chartExpand: "Expand",
+    chartClose: "Close",
     strategySelector: "Strategies",
     strategySelectorHelp: "Pick any strategy to inspect its score, rule passes, failures, and chart overlays.",
     pass: "Pass",
@@ -77,6 +102,9 @@ const COPY = {
     chart: "Gráfico",
     chartHelp: "Velas por hora con medias móviles y anotaciones de la estrategia.",
     chartEmpty: "Ejecuta un análisis para mostrar el gráfico por hora.",
+    chartReset: "Reiniciar vista",
+    chartExpand: "Expandir",
+    chartClose: "Cerrar",
     strategySelector: "Estrategias",
     strategySelectorHelp: "Elige cualquier estrategia para revisar su puntaje, reglas aprobadas, fallidas y anotaciones del gráfico.",
     pass: "Pasa",
@@ -439,11 +467,13 @@ export function AnalyzerClient() {
                   label: translateDynamic(annotation.label, locale),
                 }))}
                 emptyLabel={copy.chartEmpty}
+                expandLabel={copy.chartExpand}
+                closeLabel={copy.chartClose}
               />
             </div>
             <div className="chart-legend">
-              <span><span className="legend-dot" style={{ background: "#14b8a6" }} /> MA20</span>
-              <span><span className="legend-dot" style={{ background: "#22c55e" }} /> {copy.supportLegend}</span>
+              <span><span className="legend-dot" style={{ background: "#0f172a" }} /> MA20</span>
+              <span><span className="legend-dot" style={{ background: "#d946ef" }} /> {copy.supportLegend}</span>
               <span><span className="legend-dot" style={{ background: "#f97316" }} /> {copy.breakLegend}</span>
               <span><span className="legend-dot" style={{ background: "#a855f7" }} /> {copy.gapLegend}</span>
               <span><span className="legend-dot" style={{ background: "#eab308" }} /> {copy.triggerLegend}</span>

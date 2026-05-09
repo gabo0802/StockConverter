@@ -283,11 +283,67 @@ input {
 }
 
 .chart-surface {
+  position: relative;
   border-radius: 24px;
   overflow: hidden;
   min-height: 460px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.chart-stage {
+  position: relative;
+  min-height: 460px;
+}
+
+.chart-canvas-shell {
+  height: 100%;
+  min-height: 460px;
+}
+
+.chart-canvas-expanded {
+  min-height: 720px;
+}
+
+.chart-controls,
+.chart-modal-toolbar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+}
+
+.chart-control-button {
+  border: 1px solid rgba(31, 41, 55, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  padding: 8px 12px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.chart-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.44);
+  padding: 28px;
+}
+
+.chart-modal {
+  position: relative;
+  width: min(1400px, 100%);
+  border-radius: 28px;
+  background: rgba(255, 252, 247, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+  padding: 22px;
 }
 
 .chart-legend {
@@ -330,5 +386,13 @@ input {
   .ghost-button,
   .primary-button {
     width: 100%;
+  }
+
+  .chart-modal-backdrop {
+    padding: 14px;
+  }
+
+  .chart-modal {
+    padding: 16px;
   }
 }
