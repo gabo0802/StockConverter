@@ -1,2 +1,5 @@
-venv/
+.next/
+coverage/
+node_modules/
 .venv/
+*.log
