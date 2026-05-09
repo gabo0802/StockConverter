@@ -1,5 +1,5 @@
 import YahooFinance from "yahoo-finance2";
-import { enrichCandles, sanitizeCandles } from "@/lib/indicators";
+import { cleanMarketCandles, enrichCandles, sanitizeCandles } from "@/lib/indicators";
 import { buildAnalysisResponse } from "@/lib/strategy-engine";
 import type { AnalysisResponse } from "@/lib/types";
 
@@ -39,6 +39,7 @@ export async function fetchSymbolAnalysis(rawTicker: string): Promise<AnalysisRe
     yahooFinance.chart(ticker, {
       period1: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45),
       interval: "1h",
+      includePrePost: false,
     }),
     yahooFinance.chart(ticker, {
       period1: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365),
@@ -46,17 +47,36 @@ export async function fetchSymbolAnalysis(rawTicker: string): Promise<AnalysisRe
     }),
   ]);
 
-  const hourly = enrichCandles(normalizeQuotes(hourlyChart.quotes));
-  const daily = enrichCandles(normalizeQuotes(dailyChart.quotes));
+  const rawHourly = normalizeQuotes(hourlyChart.quotes);
+  const rawDaily = normalizeQuotes(dailyChart.quotes);
+  const cleanedHourly = cleanMarketCandles(rawHourly, { regularHoursOnly: true, rangeThresholdPct: 0.18 });
+  const cleanedDaily = cleanMarketCandles(rawDaily, { regularHoursOnly: false, rangeThresholdPct: 0.22 });
+  const hourly = enrichCandles(cleanedHourly.candles);
+  const daily = enrichCandles(cleanedDaily.candles);
 
   if (hourly.length < 40 || daily.length < 100) {
     throw new Error(`Not enough market data is available for ${ticker}.`);
   }
 
-  return buildAnalysisResponse({
+  const response = buildAnalysisResponse({
     symbol: ticker,
     displayName: quote.longName ?? quote.shortName ?? ticker,
     hourly,
     daily,
   });
+
+  const warnings = [...response.warnings];
+  if (cleanedHourly.removedExtendedHours > 0) {
+    warnings.push(`Removed ${cleanedHourly.removedExtendedHours} extended-hours candles from intraday data.`);
+  }
+  if (cleanedHourly.removedSuspicious > 0 || cleanedDaily.removedSuspicious > 0) {
+    warnings.push(
+      `Removed ${cleanedHourly.removedSuspicious + cleanedDaily.removedSuspicious} suspicious candles that looked inconsistent with regular price action.`,
+    );
+  }
+
+  return {
+    ...response,
+    warnings,
+  };
 }

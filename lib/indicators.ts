@@ -17,6 +17,80 @@ export function sanitizeCandles(candles: Array<Partial<PriceCandle> & { time: st
     }));
 }
 
+function getNewYorkParts(dateString: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(new Date(dateString));
+  const hour = Number.parseInt(parts.find((part) => part.type === "hour")?.value ?? "0", 10);
+  const minute = Number.parseInt(parts.find((part) => part.type === "minute")?.value ?? "0", 10);
+  return { hour, minute, minutesOfDay: hour * 60 + minute };
+}
+
+export function isRegularMarketHour(dateString: string): boolean {
+  const { minutesOfDay } = getNewYorkParts(dateString);
+  return minutesOfDay >= 570 && minutesOfDay <= 960;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+export function cleanMarketCandles(
+  candles: PriceCandle[],
+  options?: { regularHoursOnly?: boolean; rangeThresholdPct?: number },
+): { candles: PriceCandle[]; removedExtendedHours: number; removedSuspicious: number } {
+  const regularHoursOnly = options?.regularHoursOnly ?? false;
+  const rangeThresholdPct = options?.rangeThresholdPct ?? 0.18;
+  const afterHoursFiltered = regularHoursOnly ? candles.filter((candle) => isRegularMarketHour(candle.time)) : candles;
+  const removedExtendedHours = candles.length - afterHoursFiltered.length;
+
+  const rangePcts = afterHoursFiltered
+    .map((candle) => (candle.close > 0 ? (candle.high - candle.low) / candle.close : 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const medianRangePct = median(rangePcts);
+  const dynamicThreshold = Math.min(Math.max(rangeThresholdPct, medianRangePct * 6), 0.35);
+
+  const filtered = afterHoursFiltered.filter((candle, index) => {
+    const structurallyValid =
+      candle.high >= Math.max(candle.open, candle.close) &&
+      candle.low <= Math.min(candle.open, candle.close) &&
+      candle.low > 0 &&
+      candle.high >= candle.low;
+    if (!structurallyValid) {
+      return false;
+    }
+
+    const rangePct = candle.close > 0 ? (candle.high - candle.low) / candle.close : Number.POSITIVE_INFINITY;
+    if (rangePct > dynamicThreshold) {
+      return false;
+    }
+
+    if (index === 0) {
+      return true;
+    }
+
+    const previousClose = afterHoursFiltered[index - 1].close;
+    const jumpPct = previousClose > 0 ? Math.abs(candle.open - previousClose) / previousClose : 0;
+    return jumpPct <= Math.max(0.15, medianRangePct * 10);
+  });
+
+  return {
+    candles: filtered,
+    removedExtendedHours,
+    removedSuspicious: afterHoursFiltered.length - filtered.length,
+  };
+}
+
 export function simpleMovingAverage(values: number[], period: number): Array<number | null> {
   const result: Array<number | null> = Array(values.length).fill(null);
   let running = 0;
@@ -95,13 +169,7 @@ export function isHammerCandle(candle: PriceCandle): boolean {
 }
 
 export function getNewYorkHour(dateString: string): number {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    hour12: false,
-  });
-
-  return Number.parseInt(formatter.format(new Date(dateString)), 10);
+  return getNewYorkParts(dateString).hour;
 }
 
 export function getNewYorkDateKey(dateString: string): string {
