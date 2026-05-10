@@ -9,6 +9,9 @@ import {
   type IChartApi,
   type ISeriesApi,
   type SeriesMarker,
+  type TickMarkFormatter,
+  TickMarkType,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
@@ -44,8 +47,66 @@ const CHART_THEME = {
   },
 } as const;
 
+const MARKET_TIME_ZONE = "America/New_York";
+const NY_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: MARKET_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+const NY_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: MARKET_TIME_ZONE,
+  month: "short",
+  day: "numeric",
+});
+const NY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: MARKET_TIME_ZONE,
+  month: "short",
+  year: "2-digit",
+});
+const NY_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: MARKET_TIME_ZONE,
+  year: "numeric",
+});
+
 function toTimestamp(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
+}
+
+function timeToDate(time: Time): Date {
+  if (typeof time === "number") {
+    return new Date(time * 1000);
+  }
+
+  if (typeof time === "string") {
+    return new Date(time);
+  }
+
+  const month = String(time.month).padStart(2, "0");
+  const day = String(time.day).padStart(2, "0");
+  return new Date(`${time.year}-${month}-${day}T00:00:00Z`);
+}
+
+const formatTickMark: TickMarkFormatter = (time, tickMarkType) => {
+  const date = timeToDate(time);
+
+  switch (tickMarkType) {
+    case TickMarkType.Time:
+    case TickMarkType.TimeWithSeconds:
+      return NY_TIME_FORMATTER.format(date);
+    case TickMarkType.DayOfMonth:
+      return NY_DATE_FORMATTER.format(date);
+    case TickMarkType.Month:
+      return NY_MONTH_FORMATTER.format(date);
+    case TickMarkType.Year:
+      return NY_YEAR_FORMATTER.format(date);
+    default:
+      return NY_TIME_FORMATTER.format(date);
+  }
+};
+
+function formatCrosshairTime(time: Time): string {
+  return NY_TIME_FORMATTER.format(timeToDate(time));
 }
 
 function addMaSeries(chart: IChartApi, candles: EnrichedCandle[], accessor: (candle: EnrichedCandle) => number | null, color: string) {
@@ -138,6 +199,10 @@ function StrategyChartCanvas({
         textColor: palette.text,
         fontFamily: "Georgia, serif",
       },
+      localization: {
+        locale: "en-US",
+        timeFormatter: formatCrosshairTime,
+      },
       grid: {
         vertLines: { color: palette.grid },
         horzLines: { color: palette.grid },
@@ -148,6 +213,7 @@ function StrategyChartCanvas({
         borderColor: palette.border,
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: formatTickMark,
       },
       rightPriceScale: {
         borderColor: palette.border,
