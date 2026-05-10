@@ -1,4 +1,5 @@
 import { GET } from "@/app/api/watchlist/route";
+import { resetSecurityStateForTests } from "@/lib/security";
 import { getWatchlistScreen } from "@/lib/watchlist-service";
 import type { WatchlistResponse } from "@/lib/types";
 import { beforeEach, vi } from "vitest";
@@ -19,6 +20,7 @@ const mockResponse: WatchlistResponse = {
 describe("GET /api/watchlist", () => {
   beforeEach(() => {
     vi.mocked(getWatchlistScreen).mockReset();
+    resetSecurityStateForTests();
   });
 
   it("returns watchlist screening data", async () => {

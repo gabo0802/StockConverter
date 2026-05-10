@@ -1,10 +1,12 @@
 import YahooFinance from "yahoo-finance2";
 import { cleanMarketCandles, enrichCandles, sanitizeCandles } from "@/lib/indicators";
+import { validateTicker } from "@/lib/security";
 import { buildAnalysisResponse } from "@/lib/strategy-engine";
 import type { AnalysisResponse, CacheStatus } from "@/lib/types";
 import { ANALYSIS_TTL_MS } from "@/lib/watchlist";
 
 const yahooFinance = new YahooFinance();
+const MAX_ANALYSIS_CACHE_ENTRIES = 250;
 type CachedAnalysisEntry = {
   analysis: AnalysisResponse;
   expiresAt: number;
@@ -12,6 +14,30 @@ type CachedAnalysisEntry = {
 
 const analysisCache = new Map<string, CachedAnalysisEntry>();
 const analysisInflight = new Map<string, Promise<{ analysis: AnalysisResponse; source: Exclude<CacheStatus, "error" | "not_analyzed"> }>>();
+
+function pruneAnalysisCache(now = Date.now()) {
+  for (const [key, entry] of analysisCache.entries()) {
+    if (entry.expiresAt <= now) {
+      analysisCache.delete(key);
+    }
+  }
+}
+
+function enforceAnalysisCacheBound() {
+  pruneAnalysisCache();
+  if (analysisCache.size <= MAX_ANALYSIS_CACHE_ENTRIES) {
+    return;
+  }
+
+  const overflow = analysisCache.size - MAX_ANALYSIS_CACHE_ENTRIES;
+  const entriesByExpiry = [...analysisCache.entries()].sort(
+    (left, right) => left[1].expiresAt - right[1].expiresAt,
+  );
+
+  for (const [key] of entriesByExpiry.slice(0, overflow)) {
+    analysisCache.delete(key);
+  }
+}
 
 function normalizeQuotes(
   quotes: Array<{
@@ -55,11 +81,7 @@ export async function fetchQuoteSnapshots(symbols: string[]) {
 }
 
 export async function fetchSymbolAnalysis(rawTicker: string): Promise<AnalysisResponse> {
-  const ticker = rawTicker.trim().toUpperCase();
-
-  if (!ticker) {
-    throw new Error("Ticker is required.");
-  }
+  const ticker = validateTicker(rawTicker);
 
   const [quote, hourlyChart, dailyChart] = await Promise.all([
     yahooFinance.quote(ticker),
@@ -112,9 +134,10 @@ export async function getCachedSymbolAnalysis(
   rawTicker: string,
   options?: { forceRefresh?: boolean; ttlMs?: number },
 ): Promise<{ analysis: AnalysisResponse; source: Exclude<CacheStatus, "error" | "not_analyzed"> }> {
-  const ticker = rawTicker.trim().toUpperCase();
+  const ticker = validateTicker(rawTicker);
   const ttlMs = options?.ttlMs ?? ANALYSIS_TTL_MS;
   const forceRefresh = options?.forceRefresh ?? false;
+  pruneAnalysisCache();
   const cached = analysisCache.get(ticker);
   const now = Date.now();
 
@@ -133,6 +156,7 @@ export async function getCachedSymbolAnalysis(
         analysis,
         expiresAt: Date.now() + ttlMs,
       });
+      enforceAnalysisCacheBound();
       return {
         analysis,
         source: forceRefresh ? ("refreshed" as const) : ("fresh" as const),

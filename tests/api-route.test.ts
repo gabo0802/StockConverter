@@ -1,4 +1,5 @@
 import { GET } from "@/app/api/analyze/route";
+import { resetSecurityStateForTests } from "@/lib/security";
 import { getCachedSymbolAnalysis } from "@/lib/yahoo";
 import type { AnalysisResponse } from "@/lib/types";
 import { beforeEach, vi } from "vitest";
@@ -36,6 +37,7 @@ const mockResponse: AnalysisResponse = {
 describe("GET /api/analyze", () => {
   beforeEach(() => {
     vi.mocked(getCachedSymbolAnalysis).mockReset();
+    resetSecurityStateForTests();
   });
 
   it("returns a 400 when no ticker is provided", async () => {
@@ -48,6 +50,11 @@ describe("GET /api/analyze", () => {
     const response = await GET(new Request("http://localhost/api/analyze?ticker=SPY"));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ symbol: "SPY" });
+  });
+
+  it("returns a 400 for invalid ticker input", async () => {
+    const response = await GET(new Request("http://localhost/api/analyze?ticker=SPY<script>"));
+    expect(response.status).toBe(400);
   });
 
   it("returns a 502 when upstream analysis fails", async () => {

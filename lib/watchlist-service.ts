@@ -193,7 +193,7 @@ export async function getWatchlistScreen(options?: { forceRefresh?: boolean }): 
           symbol,
           analysis: null,
           source: "error" as const,
-          error: error instanceof Error ? error.message : "Unknown watchlist analysis error.",
+          error: "Analysis temporarily unavailable.",
         };
       }
     }),
@@ -210,7 +210,7 @@ export async function getWatchlistScreen(options?: { forceRefresh?: boolean }): 
       }
       analysisMeta.set(item.symbol, { status: item.source });
     } else {
-      analysisMeta.set(item.symbol, { status: "error", error: item.error ?? "Unknown watchlist analysis error." });
+      analysisMeta.set(item.symbol, { status: "error", error: item.error ?? "Analysis temporarily unavailable." });
     }
   }
 
