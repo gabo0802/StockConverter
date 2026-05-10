@@ -15,6 +15,35 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import type { ChartAnnotation, EnrichedCandle } from "@/lib/types";
 
+type ThemeMode = "light" | "dark";
+
+const CHART_THEME = {
+  light: {
+    background: "#fffdf9",
+    text: "#334155",
+    grid: "rgba(148, 163, 184, 0.18)",
+    border: "rgba(148, 163, 184, 0.25)",
+    up: "#16a34a",
+    down: "#dc2626",
+    ma20: "#38bdf8",
+    ma40: "#f59e0b",
+    ma100: "#f97316",
+    ma200: "#8b5cf6",
+  },
+  dark: {
+    background: "#0f172a",
+    text: "#e2e8f0",
+    grid: "rgba(148, 163, 184, 0.16)",
+    border: "rgba(148, 163, 184, 0.28)",
+    up: "#22c55e",
+    down: "#f87171",
+    ma20: "#67e8f9",
+    ma40: "#fbbf24",
+    ma100: "#fb923c",
+    ma200: "#c084fc",
+  },
+} as const;
+
 function toTimestamp(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
 }
@@ -86,12 +115,14 @@ function StrategyChartCanvas({
   emptyLabel,
   height,
   chartRef,
+  theme,
 }: {
   candles: EnrichedCandle[] | null;
   annotations: ChartAnnotation[];
   emptyLabel: string;
   height: number;
   chartRef?: MutableRefObject<IChartApi | null>;
+  theme: ThemeMode;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
@@ -100,25 +131,26 @@ function StrategyChartCanvas({
       return;
     }
 
+    const palette = CHART_THEME[theme];
     const chart = createChart(hostRef.current, {
       layout: {
-        background: { color: "#fffdf9" },
-        textColor: "#334155",
+        background: { color: palette.background },
+        textColor: palette.text,
         fontFamily: "Georgia, serif",
       },
       grid: {
-        vertLines: { color: "rgba(148, 163, 184, 0.18)" },
-        horzLines: { color: "rgba(148, 163, 184, 0.18)" },
+        vertLines: { color: palette.grid },
+        horzLines: { color: palette.grid },
       },
       width: hostRef.current.clientWidth,
       height,
       timeScale: {
-        borderColor: "rgba(148, 163, 184, 0.25)",
+        borderColor: palette.border,
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: "rgba(148, 163, 184, 0.25)",
+        borderColor: palette.border,
       },
     });
     if (chartRef) {
@@ -126,11 +158,11 @@ function StrategyChartCanvas({
     }
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#16a34a",
-      downColor: "#dc2626",
+      upColor: palette.up,
+      downColor: palette.down,
       borderVisible: false,
-      wickUpColor: "#16a34a",
-      wickDownColor: "#dc2626",
+      wickUpColor: palette.up,
+      wickDownColor: palette.down,
     });
 
     candleSeries.setData(
@@ -143,10 +175,10 @@ function StrategyChartCanvas({
       })),
     );
 
-    addMaSeries(chart, candles, (candle) => candle.ma20, "#0f172a");
-    addMaSeries(chart, candles, (candle) => candle.ma40, "#d946ef");
-    addMaSeries(chart, candles, (candle) => candle.ma100, "#f97316");
-    addMaSeries(chart, candles, (candle) => candle.ma200, "#7c3aed");
+    addMaSeries(chart, candles, (candle) => candle.ma20, palette.ma20);
+    addMaSeries(chart, candles, (candle) => candle.ma40, palette.ma40);
+    addMaSeries(chart, candles, (candle) => candle.ma100, palette.ma100);
+    addMaSeries(chart, candles, (candle) => candle.ma200, palette.ma200);
 
     const markers: SeriesMarker<UTCTimestamp>[] = [];
     for (const annotation of annotations) {
@@ -171,7 +203,7 @@ function StrategyChartCanvas({
       }
       chart.remove();
     };
-  }, [annotations, candles, chartRef, height]);
+  }, [annotations, candles, chartRef, height, theme]);
 
   if (!candles) {
     return <div ref={hostRef} style={{ height: "100%", minHeight: height, padding: 24 }} className="muted">{emptyLabel}</div>;
@@ -186,12 +218,14 @@ export function StrategyChart({
   emptyLabel,
   expandLabel,
   closeLabel,
+  theme,
 }: {
   candles: EnrichedCandle[] | null;
   annotations: ChartAnnotation[];
   emptyLabel: string;
   expandLabel: string;
   closeLabel: string;
+  theme: ThemeMode;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const baseChartRef = useRef<IChartApi | null>(null);
@@ -234,6 +268,7 @@ export function StrategyChart({
             emptyLabel={emptyLabel}
             height={460}
             chartRef={baseChartRef}
+            theme={theme}
           />
         </div>
       </div>
@@ -254,6 +289,7 @@ export function StrategyChart({
                     emptyLabel={emptyLabel}
                     height={720}
                     chartRef={modalChartRef}
+                    theme={theme}
                   />
                 </div>
               </div>
@@ -264,3 +300,5 @@ export function StrategyChart({
     </>
   );
 }
+
+export { CHART_THEME };

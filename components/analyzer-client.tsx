@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AnalysisResponse,
   ChartAnnotation,
@@ -12,6 +12,130 @@ import type {
 import { StrategyChart } from "@/components/strategy-chart";
 import { WATCHLIST_SYMBOLS } from "@/lib/watchlist";
 type Locale = "en" | "es";
+type ThemeMode = "light" | "dark";
+
+const THEME_STORAGE_KEY = "strategy-signal-theme";
+
+function DarkModeIcon() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      focusable="false"
+      className="control-icon"
+    >
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M32.8 29.3c-8.9-.8-16.2-7.8-17.5-16.6c-.3-1.8-.3-3.7 0-5.4c.2-1.4-1.4-2.3-2.5-1.6C6.3 9.7 2.1 16.9 2.5 25c.5 10.7 9 19.5 19.7 20.4c10.6.9 19.8-6 22.5-15.6c.4-1.4-1-2.6-2.3-2q-4.35 1.95-9.6 1.5"
+      />
+    </svg>
+  );
+}
+
+function SpainFlagIcon() {
+  return (
+    <svg
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+      focusable="false"
+      className="control-icon control-icon-flag"
+    >
+      <path
+        fill="#FFB636"
+        d="M1.793 161.987v186.402c169.54 52.36 339.079-52.36 508.619 0V161.987c-169.54-52.36-339.079 52.359-508.619 0"
+      />
+      <path
+        fill="#E8E8E8"
+        d="M171.242 289.342h-36.121v-41.325h30.361a5.76 5.76 0 0 1 5.76 5.76z"
+      />
+      <path
+        fill="#E2A042"
+        d="M172.313 220.667h-31.481c.948-2.526 1.518-5.688 1.518-9.131c0-8.248-3.237-14.934-7.229-14.934s-7.229 6.686-7.229 14.934c0 3.443.57 6.605 1.518 9.131H97.959c-2.445 0-4.177 2.389-3.416 4.713l3.651 11.157a3.595 3.595 0 0 0 3.398 2.477l67.015.334a3.59 3.59 0 0 0 3.44-2.496l3.688-11.491c.745-2.321-.985-4.694-3.422-4.694"
+      />
+      <path
+        fill="#E8E8E8"
+        d="M87.304 281.017a9.304 9.304 0 1 0-18.608 0c0 3.705 2.171 6.894 5.304 8.391v31.509c0 .787.638 1.425 1.425 1.425h5.15c.787 0 1.425-.638 1.425-1.425v-31.509c3.134-1.497 5.304-4.686 5.304-8.391m111.667 0a9.304 9.304 0 1 0-18.608 0c0 3.705 2.17 6.894 5.304 8.391v31.509c0 .787.638 1.425 1.425 1.425h5.15c.787 0 1.425-.638 1.425-1.425v-31.509c3.133-1.497 5.304-4.686 5.304-8.391"
+      />
+      <path
+        fill="#FF473E"
+        d="M510.412 94.03v67.957c-169.54-52.36-339.079 52.36-508.619 0v-57.54c0-11.042 10.303-19.16 21.051-16.631c158.611 37.323 317.223-51.454 475.834-9.093c6.924 1.849 11.734 8.14 11.734 15.307M1.793 348.39v67.956c0 7.167 4.81 13.458 11.734 15.307c159.129 42.499 318.258-46.998 477.387-8.724c9.944 2.392 19.499-5.177 19.499-15.405v-59.136c-169.541-52.358-339.08 52.362-508.62.002m133.328-59.048v-41.325h-30.362A5.76 5.76 0 0 0 99 253.776v50.506c0 9.975 8.086 18.06 18.061 18.06s18.06-8.086 18.06-18.06c0 9.975 8.086 18.06 18.061 18.06s18.06-8.086 18.06-18.06v-14.94zm6.559-67.825c-4.372.174-8.745.353-13.117.528v18.481c4.372-.153 8.745-.312 13.117-.464zm-35.013 19.599a941 941 0 0 0 13.117-.303v-18.44c-4.372.154-8.745.289-13.117.38zm56.909-20.308c-4.372.092-8.745.227-13.117.381v18.586q6.559-.199 13.117-.304z"
+      />
+      <path
+        fill="#E2A042"
+        d="M127.793 289.342h7.328v14.94c0 5.949-2.89 11.211-7.328 14.501zm-21.465 29.441v-29.441H99v14.94c0 5.949 2.89 11.21 7.328 14.501m14.397-29.441h-7.328v32.627a18.1 18.1 0 0 0 7.328 0z"
+      />
+      <path
+        fill="#575A5B"
+        d="M147.459 289.342c0 6.814-5.524 12.338-12.338 12.338s-12.338-5.524-12.338-12.338s5.524-12.338 12.338-12.338s12.338 5.524 12.338 12.338m-60.155 35.089v-3.086a4.65 4.65 0 0 0-4.649-4.649h-9.31a4.65 4.65 0 0 0-4.649 4.649v3.086a4.65 4.65 0 0 0 4.649 4.649h9.31a4.65 4.65 0 0 0 4.649-4.649m111.667 0v-3.086a4.65 4.65 0 0 0-4.649-4.649h-9.31a4.65 4.65 0 0 0-4.649 4.649v3.086a4.65 4.65 0 0 0 4.649 4.649h9.31a4.65 4.65 0 0 0 4.649-4.649"
+      />
+    </svg>
+  );
+}
+
+function AmericanFlagIcon() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      focusable="false"
+      className="control-icon"
+    >
+      <path
+        fill="#fff"
+        stroke="#45413c"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M24 9.53A48.9 48.9 0 0 0 8.37 7H1.61a1 1 0 0 0-1.11.84v27.75a1 1 0 0 0 1.11.85h6.76A48.9 48.9 0 0 1 24 39h0a48.9 48.9 0 0 0 15.63 2.5h6.76c.61 0 1.11-.37 1.11-.84V12.91a1 1 0 0 0-1.11-.84h-6.76A48.6 48.6 0 0 1 24 9.53"
+      />
+      <path
+        fill="#ff6242"
+        stroke="#45413c"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M47.5 16.29h-7.87A48.9 48.9 0 0 1 24 13.76h0a48.9 48.9 0 0 0-15.63-2.54H.5V7.84A1 1 0 0 1 1.61 7h6.76A48.9 48.9 0 0 1 24 9.53h0a48.6 48.6 0 0 0 15.63 2.54h6.76a1 1 0 0 1 1.11.84Zm0 4.23h-7.87A48.9 48.9 0 0 1 24 18h0a48.9 48.9 0 0 0-15.63-2.55H.5v4.22h7.87A48.9 48.9 0 0 1 24 22.21h0a48.9 48.9 0 0 0 15.63 2.53h7.87Zm0 8.31h-7.87A48.9 48.9 0 0 1 24 26.3h0a48.9 48.9 0 0 0-15.63-2.54H.5V28h7.87A48.9 48.9 0 0 1 24 30.52h0a48.9 48.9 0 0 0 15.63 2.54h7.87ZM46.39 41.5c.61 0 1.11-.37 1.11-.84v-3.38h-7.87A48.9 48.9 0 0 1 24 34.75h0a48.6 48.6 0 0 0-15.63-2.54H.5v3.38a1 1 0 0 0 1.11.85h6.76A48.9 48.9 0 0 1 24 39h0a48.9 48.9 0 0 0 15.63 2.5Z"
+      />
+      <path
+        fill="#00b8f0"
+        stroke="#45413c"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.3 8.22A49.7 49.7 0 0 0 8.37 7H1.61a1 1 0 0 0-1.11.84v11.83h7.87a49.7 49.7 0 0 1 10.93 1.22Z"
+      />
+      <path
+        fill="#fff"
+        d="m4.72 9.46l.29.59a.16.16 0 0 0 .12.09l.66.1a.16.16 0 0 1 .09.27L5.4 11a.2.2 0 0 0 0 .15l.11.65a.17.17 0 0 1-.24.17l-.58-.31a.2.2 0 0 0-.15 0l-.59.31a.16.16 0 0 1-.23-.17l.11-.65a.17.17 0 0 0 0-.15l-.47-.46a.16.16 0 0 1 .09-.27l.65-.1a.18.18 0 0 0 .13-.09l.29-.59a.16.16 0 0 1 .2-.03m4.8 0l.29.59a.18.18 0 0 0 .12.09l.66.1a.16.16 0 0 1 .09.27l-.48.49a.2.2 0 0 0 0 .15l.11.65a.16.16 0 0 1-.23.17l-.59-.31a.2.2 0 0 0-.15 0l-.59.31a.16.16 0 0 1-.23-.17l.11-.65a.2.2 0 0 0 0-.15l-.48-.46a.16.16 0 0 1 .09-.27l.66-.1a.18.18 0 0 0 .12-.09l.29-.59a.16.16 0 0 1 .21-.03m4.77.99l.29.59a.16.16 0 0 0 .12.09l.65.09a.16.16 0 0 1 .09.28L15 12a.16.16 0 0 0-.05.14l.12.66a.17.17 0 0 1-.24.17l-.58-.31a.14.14 0 0 0-.15 0l-.59.31a.16.16 0 0 1-.23-.17l.11-.66a.16.16 0 0 0 0-.14l-.47-.46a.16.16 0 0 1 .09-.28l.65-.09a.16.16 0 0 0 .04-.17l.3-.59a.16.16 0 0 1 .29.04m-9.57 3.74l.29.59a.16.16 0 0 0 .12.09l.66.09a.17.17 0 0 1 .09.28l-.48.46a.18.18 0 0 0 0 .14l.11.65a.16.16 0 0 1-.24.17l-.58-.3a.14.14 0 0 0-.15 0l-.59.3a.16.16 0 0 1-.23-.17l.11-.65a.16.16 0 0 0 0-.14l-.47-.46a.17.17 0 0 1 0-.24l.64-.13a.18.18 0 0 0 .13-.09l.29-.59a.16.16 0 0 1 .3 0m4.8 0l.29.59a.18.18 0 0 0 .12.09l.66.09a.17.17 0 0 1 .09.28l-.48.46a.18.18 0 0 0 0 .14l.11.65a.16.16 0 0 1-.23.17l-.59-.3a.14.14 0 0 0-.15 0l-.59.3a.16.16 0 0 1-.23-.17l.11-.65a.18.18 0 0 0 0-.14l-.48-.46a.17.17 0 0 1 .01-.24l.66-.09a.18.18 0 0 0 .12-.09l.29-.59a.16.16 0 0 1 .29-.04m4.77.98l.29.6a.15.15 0 0 0 .12.08l.65.1a.15.15 0 0 1 .09.27l-.47.47a.15.15 0 0 0-.05.14l.12.65a.17.17 0 0 1-.24.17l-.58-.31a.2.2 0 0 0-.15 0l-.59.31a.16.16 0 0 1-.23-.17l.11-.65a.15.15 0 0 0 0-.14l-.47-.47a.15.15 0 0 1 .09-.27l.65-.1a.15.15 0 0 0 .12-.08l.3-.6a.16.16 0 0 1 .24 0"
+      />
+      <path
+        fill="#45413c"
+        d="M11 45.5a11.5 1.5 0 1 0 23 0a11.5 1.5 0 1 0-23 0"
+        opacity=".15"
+      />
+    </svg>
+  );
+}
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "dark" || storedTheme === "light") {
+    return storedTheme;
+  }
+
+  if (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
 
 const COPY = {
   en: {
@@ -26,6 +150,8 @@ const COPY = {
     scanning: "Scanning...",
     translate: "Translate to Spanish",
     translateBack: "Translate to English",
+    darkMode: "Dark mode",
+    lightMode: "Light mode",
     disclaimer:
       "Final decisions in the source guide happen on the hourly timeframe after 11:00 AM. This tool is educational only and does not place trades or give advice.",
     requestFailed: "Request failed.",
@@ -89,6 +215,8 @@ const COPY = {
     scanning: "Analizando...",
     translate: "Traducir al español",
     translateBack: "Translate to English",
+    darkMode: "Modo oscuro",
+    lightMode: "Modo claro",
     disclaimer:
       "Las decisiones finales en la guía original ocurren en el marco de una hora después de las 11:00 AM. Esta herramienta es solo educativa y no ejecuta operaciones ni da asesoría financiera.",
     requestFailed: "La solicitud falló.",
@@ -406,6 +534,7 @@ function SignalChecklist({
 export function AnalyzerClient() {
   const [ticker, setTicker] = useState("SPY");
   const [locale, setLocale] = useState<Locale>("en");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [watchlistResult, setWatchlistResult] =
     useState<WatchlistResponse | null>(null);
@@ -415,7 +544,9 @@ export function AnalyzerClient() {
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const themeInitializedRef = useRef(false);
   const copy = COPY[locale];
+  const chartTheme = theme;
 
   const activeStrategy =
     result?.strategies.find(
@@ -433,6 +564,32 @@ export function AnalyzerClient() {
   const activeAnnotations: ChartAnnotation[] = activeStrategy
     ? [...activeStrategy.annotations]
     : (result?.annotations ?? []);
+
+  useEffect(() => {
+    const initialTheme = getInitialTheme();
+    document.documentElement.dataset.theme = initialTheme;
+    document.documentElement.style.colorScheme = initialTheme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, initialTheme);
+    themeInitializedRef.current = true;
+
+    if (initialTheme !== "light") {
+      const timeoutId = window.setTimeout(() => {
+        setTheme(initialTheme);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!themeInitializedRef.current) {
+      return;
+    }
+
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -580,7 +737,29 @@ export function AnalyzerClient() {
   return (
     <main className="page-shell">
       <section className="hero">
-        <span className="eyebrow">{copy.eyebrow}</span>
+        <div className="hero-topbar">
+          <span className="eyebrow">{copy.eyebrow}</span>
+          <div className="page-controls">
+            <button
+              className="icon-button"
+              type="button"
+              aria-label={theme === "light" ? copy.darkMode : copy.lightMode}
+              title={theme === "light" ? copy.darkMode : copy.lightMode}
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            >
+              <DarkModeIcon />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label={locale === "en" ? copy.translate : copy.translateBack}
+              title={locale === "en" ? copy.translate : copy.translateBack}
+              onClick={() => setLocale(locale === "en" ? "es" : "en")}
+            >
+              {locale === "en" ? <SpainFlagIcon /> : <AmericanFlagIcon />}
+            </button>
+          </div>
+        </div>
         <h1>{copy.headline}</h1>
         <p>{copy.intro}</p>
       </section>
@@ -593,13 +772,6 @@ export function AnalyzerClient() {
                 <h2>{copy.search}</h2>
                 <p className="muted">{copy.searchHelp}</p>
               </div>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setLocale(locale === "en" ? "es" : "en")}
-              >
-                {locale === "en" ? copy.translate : copy.translateBack}
-              </button>
             </div>
             <form
               className="search-form"
@@ -750,20 +922,25 @@ export function AnalyzerClient() {
                 emptyLabel={copy.chartEmpty}
                 expandLabel={copy.chartExpand}
                 closeLabel={copy.chartClose}
+                theme={chartTheme}
               />
             </div>
             <div className="chart-legend">
               <span>
                 <span
                   className="legend-dot"
-                  style={{ background: "#0f172a" }}
+                  style={{
+                    background: chartTheme === "dark" ? "#67e8f9" : "#38bdf8",
+                  }}
                 />{" "}
                 MA20
               </span>
               <span>
                 <span
                   className="legend-dot"
-                  style={{ background: "#d946ef" }}
+                  style={{
+                    background: chartTheme === "dark" ? "#fbbf24" : "#f59e0b",
+                  }}
                 />{" "}
                 {copy.supportLegend}
               </span>
@@ -929,9 +1106,6 @@ export function AnalyzerClient() {
                               {row.analysisStatus === "error"
                                 ? copy.screenerError
                                 : copy.screenerAnalyzed}
-                            </span>
-                            <span className="muted">
-                              {watchlistStatusLabel(row.cacheStatus)}
                             </span>
                           </div>
                         </td>

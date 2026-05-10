@@ -201,6 +201,24 @@ describe("AnalyzerClient", () => {
     expect(screen.getByText("Monitor de Watchlist")).toBeInTheDocument();
   });
 
+  it("toggles dark mode and updates the document theme", async () => {
+    installFetchMock();
+
+    render(<AnalyzerClient />);
+
+    const darkModeButton = screen.getByRole("button", { name: "Dark mode" });
+    fireEvent.click(darkModeButton);
+
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("dark");
+    });
+
+    expect(window.localStorage.getItem("strategy-signal-theme")).toBe("dark");
+    expect(
+      screen.getByRole("button", { name: "Light mode" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders fetch errors", async () => {
     installFetchMock({ analyzeOk: false, analyzeError: "Invalid ticker" });
 
