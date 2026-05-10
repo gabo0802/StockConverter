@@ -1,9 +1,17 @@
 import YahooFinance from "yahoo-finance2";
 import { cleanMarketCandles, enrichCandles, sanitizeCandles } from "@/lib/indicators";
 import { buildAnalysisResponse } from "@/lib/strategy-engine";
-import type { AnalysisResponse } from "@/lib/types";
+import type { AnalysisResponse, CacheStatus } from "@/lib/types";
+import { ANALYSIS_TTL_MS } from "@/lib/watchlist";
 
 const yahooFinance = new YahooFinance();
+type CachedAnalysisEntry = {
+  analysis: AnalysisResponse;
+  expiresAt: number;
+};
+
+const analysisCache = new Map<string, CachedAnalysisEntry>();
+const analysisInflight = new Map<string, Promise<{ analysis: AnalysisResponse; source: Exclude<CacheStatus, "error" | "not_analyzed"> }>>();
 
 function normalizeQuotes(
   quotes: Array<{
@@ -25,6 +33,25 @@ function normalizeQuotes(
       volume: quote.volume ?? undefined,
     })),
   );
+}
+
+export async function fetchQuoteSnapshots(symbols: string[]) {
+  const quotes = await yahooFinance.quote(
+    symbols.map((symbol) => symbol.trim().toUpperCase()),
+    { return: "array" },
+  );
+  return quotes.map((quote) => ({
+    symbol: "symbol" in quote ? quote.symbol : undefined,
+    shortName: "shortName" in quote ? quote.shortName : undefined,
+    longName: "longName" in quote ? quote.longName : undefined,
+    regularMarketPrice: "regularMarketPrice" in quote ? quote.regularMarketPrice : undefined,
+    regularMarketChangePercent: "regularMarketChangePercent" in quote ? quote.regularMarketChangePercent : undefined,
+    regularMarketVolume: "regularMarketVolume" in quote ? quote.regularMarketVolume : undefined,
+    marketState: "marketState" in quote ? quote.marketState : undefined,
+    tradeable: "tradeable" in quote ? quote.tradeable : undefined,
+    fiftyDayAverage: "fiftyDayAverage" in quote ? quote.fiftyDayAverage : undefined,
+    twoHundredDayAverage: "twoHundredDayAverage" in quote ? quote.twoHundredDayAverage : undefined,
+  }));
 }
 
 export async function fetchSymbolAnalysis(rawTicker: string): Promise<AnalysisResponse> {
@@ -79,4 +106,42 @@ export async function fetchSymbolAnalysis(rawTicker: string): Promise<AnalysisRe
     ...response,
     warnings,
   };
+}
+
+export async function getCachedSymbolAnalysis(
+  rawTicker: string,
+  options?: { forceRefresh?: boolean; ttlMs?: number },
+): Promise<{ analysis: AnalysisResponse; source: Exclude<CacheStatus, "error" | "not_analyzed"> }> {
+  const ticker = rawTicker.trim().toUpperCase();
+  const ttlMs = options?.ttlMs ?? ANALYSIS_TTL_MS;
+  const forceRefresh = options?.forceRefresh ?? false;
+  const cached = analysisCache.get(ticker);
+  const now = Date.now();
+
+  if (!forceRefresh && cached && cached.expiresAt > now) {
+    return { analysis: cached.analysis, source: "cached" };
+  }
+
+  const inflight = analysisInflight.get(ticker);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = fetchSymbolAnalysis(ticker)
+    .then((analysis) => {
+      analysisCache.set(ticker, {
+        analysis,
+        expiresAt: Date.now() + ttlMs,
+      });
+      return {
+        analysis,
+        source: forceRefresh ? ("refreshed" as const) : ("fresh" as const),
+      };
+    })
+    .finally(() => {
+      analysisInflight.delete(ticker);
+    });
+
+  analysisInflight.set(ticker, promise);
+  return promise;
 }

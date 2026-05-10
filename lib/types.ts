@@ -5,6 +5,8 @@ export type StrategyId =
   | "strong_floor"
   | "first_gap_up";
 
+export type CacheStatus = "fresh" | "cached" | "refreshed" | "error" | "not_analyzed";
+
 export type AnnotationType = "horizontalLine" | "trendLine" | "marker";
 
 export interface PriceCandle {
@@ -96,6 +98,46 @@ export interface AnalysisResponse {
   };
   strategies: StrategyEvaluation[];
   disclaimer: string;
+}
+
+export interface WatchlistQuoteRow {
+  symbol: string;
+  displayName: string;
+  regularMarketPrice: number | null;
+  regularMarketChangePercent: number | null;
+  regularMarketVolume: number | null;
+  marketState: string | null;
+  prefilterScore: number;
+  cacheStatus: CacheStatus;
+  analysisStatus: CacheStatus;
+  bestStrategyId?: StrategyId;
+  bestStrategyName?: string;
+  score?: number;
+  matched?: boolean;
+  summary?: string;
+  warnings?: string[];
+  error?: string;
+}
+
+export interface WatchlistOpportunityRow {
+  symbol: string;
+  bestStrategyId: StrategyId;
+  bestStrategyName: string;
+  score: number;
+  matched: boolean;
+  summary: string;
+  warnings: string[];
+  asOf: string;
+  analysisSource: Exclude<CacheStatus, "error" | "not_analyzed">;
+}
+
+export interface WatchlistResponse {
+  watchlist: string[];
+  quotes: WatchlistQuoteRow[];
+  shortlisted: string[];
+  topOpportunities: WatchlistOpportunityRow[];
+  generatedAt: string;
+  ttlSeconds: number;
 }
 
 export interface MarketContext {

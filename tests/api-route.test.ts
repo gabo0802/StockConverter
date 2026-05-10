@@ -1,10 +1,10 @@
 import { GET } from "@/app/api/analyze/route";
-import { fetchSymbolAnalysis } from "@/lib/yahoo";
+import { getCachedSymbolAnalysis } from "@/lib/yahoo";
 import type { AnalysisResponse } from "@/lib/types";
 import { beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/yahoo", () => ({
-  fetchSymbolAnalysis: vi.fn(),
+  getCachedSymbolAnalysis: vi.fn(),
 }));
 
 const mockResponse: AnalysisResponse = {
@@ -35,7 +35,7 @@ const mockResponse: AnalysisResponse = {
 
 describe("GET /api/analyze", () => {
   beforeEach(() => {
-    vi.mocked(fetchSymbolAnalysis).mockReset();
+    vi.mocked(getCachedSymbolAnalysis).mockReset();
   });
 
   it("returns a 400 when no ticker is provided", async () => {
@@ -44,14 +44,14 @@ describe("GET /api/analyze", () => {
   });
 
   it("returns analysis data for a valid ticker", async () => {
-    vi.mocked(fetchSymbolAnalysis).mockResolvedValue(mockResponse);
+    vi.mocked(getCachedSymbolAnalysis).mockResolvedValue({ analysis: mockResponse, source: "cached" });
     const response = await GET(new Request("http://localhost/api/analyze?ticker=SPY"));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ symbol: "SPY" });
   });
 
   it("returns a 502 when upstream analysis fails", async () => {
-    vi.mocked(fetchSymbolAnalysis).mockRejectedValue(new Error("Yahoo upstream unavailable"));
+    vi.mocked(getCachedSymbolAnalysis).mockRejectedValue(new Error("Yahoo upstream unavailable"));
     const response = await GET(new Request("http://localhost/api/analyze?ticker=SPY"));
     expect(response.status).toBe(502);
   });

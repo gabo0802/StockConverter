@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AnalyzerClient } from "@/components/analyzer-client";
-import type { AnalysisResponse } from "@/lib/types";
+import type { AnalysisResponse, WatchlistResponse } from "@/lib/types";
 import { beforeEach, vi } from "vitest";
 
 vi.mock("@/components/strategy-chart", () => ({
@@ -68,16 +68,105 @@ const mockResponse: AnalysisResponse = {
   disclaimer: "Educational only",
 };
 
+const watchlistResponse: WatchlistResponse = {
+  watchlist: ["SPY", "QQQ", "AAPL", "MSFT", "META", "AMZN", "NFLX", "TSLA", "NVDA", "GOOGL", "TNA", "BAC", "MRNA", "GLD", "SLV", "USO", "XOM", "CVX", "DIS", "PYPL", "CMG"],
+  quotes: [
+    {
+      symbol: "SPY",
+      displayName: "SPDR S&P 500 ETF Trust",
+      regularMarketPrice: 500,
+      regularMarketChangePercent: 1.25,
+      regularMarketVolume: 1000000,
+      marketState: "REGULAR",
+      prefilterScore: 42,
+      cacheStatus: "fresh",
+      analysisStatus: "fresh",
+      bestStrategyId: "pm40_hour",
+      bestStrategyName: "PM 40 en Hora",
+      score: 0.94,
+      matched: true,
+      summary: "Matched.",
+      warnings: [],
+    },
+    {
+      symbol: "QQQ",
+      displayName: "Invesco QQQ Trust",
+      regularMarketPrice: 450,
+      regularMarketChangePercent: 0.85,
+      regularMarketVolume: 900000,
+      marketState: "REGULAR",
+      prefilterScore: 40,
+      cacheStatus: "cached",
+      analysisStatus: "cached",
+      bestStrategyId: "bear_channel",
+      bestStrategyName: "Canal Bajista",
+      score: 0.72,
+      matched: false,
+      summary: "The bearish channel setup is incomplete or still trading inside the channel.",
+      warnings: [],
+    },
+  ],
+  shortlisted: ["SPY", "QQQ"],
+  topOpportunities: [
+    {
+      symbol: "SPY",
+      bestStrategyId: "pm40_hour",
+      bestStrategyName: "PM 40 en Hora",
+      score: 0.94,
+      matched: true,
+      summary: "Matched.",
+      warnings: [],
+      asOf: "2026-05-09T16:00:00.000Z",
+      analysisSource: "fresh",
+    },
+    {
+      symbol: "QQQ",
+      bestStrategyId: "bear_channel",
+      bestStrategyName: "Canal Bajista",
+      score: 0.72,
+      matched: false,
+      summary: "The bearish channel setup is incomplete or still trading inside the channel.",
+      warnings: [],
+      asOf: "2026-05-09T16:00:00.000Z",
+      analysisSource: "cached",
+    },
+  ],
+  generatedAt: "2026-05-09T16:00:00.000Z",
+  ttlSeconds: 120,
+};
+
+function installFetchMock(options?: { analyzeOk?: boolean; analyzeError?: string }) {
+  vi.spyOn(global, "fetch").mockImplementation(async (input) => {
+    const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    if (url.includes("/api/watchlist")) {
+      return {
+        ok: true,
+        json: async () => watchlistResponse,
+      } as Response;
+    }
+    if (url.includes("/api/analyze")) {
+      if (options?.analyzeOk === false) {
+        return {
+          ok: false,
+          json: async () => ({ error: options.analyzeError ?? "Invalid ticker" }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => mockResponse,
+      } as Response;
+    }
+    throw new Error(`Unhandled fetch URL: ${url}`);
+  });
+}
+
 describe("AnalyzerClient", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
   it("submits a search and renders the result state", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response);
+    installFetchMock();
 
     render(<AnalyzerClient />);
 
@@ -85,18 +174,16 @@ describe("AnalyzerClient", () => {
     fireEvent.submit(screen.getByRole("button", { name: "Analyze" }).closest("form") as HTMLFormElement);
 
     await waitFor(() => {
-      expect(screen.getByText("PM 40 en Hora")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "PM 40 en Hora" })).toBeInTheDocument();
     });
 
     expect(screen.getByRole("button", { name: "MSFT" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "CMG" })).toBeInTheDocument();
+    expect(screen.getByText("Watchlist Screener")).toBeInTheDocument();
   });
 
   it("lets the user inspect a different strategy and translate the UI", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response);
+    installFetchMock();
 
     render(<AnalyzerClient />);
     fireEvent.submit(screen.getByRole("button", { name: "Analyze" }).closest("form") as HTMLFormElement);
@@ -111,13 +198,11 @@ describe("AnalyzerClient", () => {
     fireEvent.click(screen.getByRole("button", { name: "Translate to Spanish" }));
     expect(screen.getByText("Lista de reglas")).toBeInTheDocument();
     expect(screen.getByText("No se detectó un canal bajista claro.")).toBeInTheDocument();
+    expect(screen.getByText("Monitor de Watchlist")).toBeInTheDocument();
   });
 
   it("renders fetch errors", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: "Invalid ticker" }),
-    } as Response);
+    installFetchMock({ analyzeOk: false, analyzeError: "Invalid ticker" });
 
     render(<AnalyzerClient />);
     fireEvent.submit(screen.getByRole("button", { name: "Analyze" }).closest("form") as HTMLFormElement);
@@ -125,5 +210,20 @@ describe("AnalyzerClient", () => {
     await waitFor(() => {
       expect(screen.getByText("Invalid ticker")).toBeInTheDocument();
     });
+  });
+
+  it("renders watchlist leaderboard and table rows", async () => {
+    installFetchMock();
+
+    render(<AnalyzerClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Top opportunities")).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText("SPY").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Quote-only this pass")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Analyze now" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Fully analyzed").length).toBeGreaterThan(0);
   });
 });

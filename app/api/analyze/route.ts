@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchSymbolAnalysis } from "@/lib/yahoo";
+import { getCachedSymbolAnalysis } from "@/lib/yahoo";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const analysis = await fetchSymbolAnalysis(ticker);
+    const { analysis } = await getCachedSymbolAnalysis(ticker);
     return NextResponse.json(analysis, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown analysis error.";
