@@ -69,7 +69,7 @@ const mockResponse: AnalysisResponse = {
 };
 
 const watchlistResponse: WatchlistResponse = {
-  watchlist: ["SPY", "QQQ", "AAPL", "MSFT", "META", "AMZN", "NFLX", "TSLA", "NVDA", "GOOGL", "TNA", "BAC", "MRNA", "GLD", "SLV", "USO", "XOM", "CVX", "DIS", "PYPL", "CMG"],
+  watchlist: ["SPY", "QQQ", "AAPL", "MSFT", "META", "AMZN", "NFLX", "TSLA", "NVDA", "GOOGL", "WMT", "AMD", "INTC", "MU", "TNA", "BAC", "MRNA", "GLD", "SLV", "USO", "XOM", "CVX", "PYPL"],
   quotes: [
     {
       symbol: "SPY",
@@ -178,7 +178,7 @@ describe("AnalyzerClient", () => {
     });
 
     expect(screen.getByRole("button", { name: "MSFT" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "CMG" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "MU" })).toBeInTheDocument();
     expect(screen.getByText("Watchlist Screener")).toBeInTheDocument();
   });
 

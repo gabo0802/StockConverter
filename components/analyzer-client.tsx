@@ -163,7 +163,7 @@ const COPY = {
     startWithSpy: "Start with SPY",
     spyHelp:
       "The strategy engine is tuned for SPY first because the guide uses SPY-specific drop, support, and volume thresholds.",
-    latestClose: "Latest close",
+    latestClose: "Current price",
     avgVolume: "Avg hourly volume",
     dailySupport: "Daily support",
     checklist: "Rule checklist",
@@ -228,7 +228,7 @@ const COPY = {
     startWithSpy: "Empieza con SPY",
     spyHelp:
       "El motor de estrategias está ajustado primero para SPY porque la guía usa umbrales específicos de SPY para caída, soporte y volumen.",
-    latestClose: "Último cierre",
+    latestClose: "Precio actual",
     avgVolume: "Volumen horario promedio",
     dailySupport: "Soporte diario",
     checklist: "Lista de reglas",

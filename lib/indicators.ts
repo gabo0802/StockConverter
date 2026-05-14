@@ -197,45 +197,140 @@ export function findDescendingResistance(candles: PriceCandle[]) {
     return null;
   }
 
-  const startIndex = Math.max(0, candles.length - 18);
+  const startIndex = Math.max(0, candles.length - 16);
   const window = candles.slice(startIndex);
-  const midpoint = Math.floor(window.length / 2);
-  const firstHalf = window.slice(0, midpoint);
-  const secondHalf = window.slice(midpoint, window.length - 1);
-
-  if (firstHalf.length === 0 || secondHalf.length === 0) {
-    return null;
-  }
-
-  let peakA = 0;
-  let peakB = 0;
-
-  firstHalf.forEach((candle, index) => {
-    if (candle.high >= firstHalf[peakA].high) {
-      peakA = index;
-    }
-  });
-
-  secondHalf.forEach((candle, index) => {
-    if (candle.high >= secondHalf[peakB].high) {
-      peakB = index;
-    }
-  });
-
-  const absoluteA = startIndex + peakA;
-  const absoluteB = startIndex + midpoint + peakB;
-
-  if (candles[absoluteB].high >= candles[absoluteA].high) {
-    return null;
-  }
-
   const latestIndex = candles.length - 1;
-  const projected = projectTrendLine(absoluteA, candles[absoluteA].high, absoluteB, candles[absoluteB].high, latestIndex);
+  const pivotIndexes: number[] = [];
+
+  for (let index = 1; index < window.length - 1; index += 1) {
+    const previous = window[index - 1];
+    const current = window[index];
+    const next = window[index + 1];
+
+    if (current.high >= previous.high && current.high >= next.high) {
+      pivotIndexes.push(index);
+    }
+  }
+
+  if (pivotIndexes.length < 2) {
+    const midpoint = Math.floor(window.length / 2);
+    const firstHalf = window.slice(0, midpoint);
+    const secondHalf = window.slice(midpoint, window.length - 1);
+
+    if (firstHalf.length === 0 || secondHalf.length === 0) {
+      return null;
+    }
+
+    let peakA = 0;
+    let peakB = 0;
+
+    firstHalf.forEach((candle, index) => {
+      if (candle.high >= firstHalf[peakA].high) {
+        peakA = index;
+      }
+    });
+
+    secondHalf.forEach((candle, index) => {
+      if (candle.high >= secondHalf[peakB].high) {
+        peakB = index;
+      }
+    });
+
+    const absoluteA = startIndex + peakA;
+    const absoluteB = startIndex + midpoint + peakB;
+
+    if (candles[absoluteB].high >= candles[absoluteA].high) {
+      return null;
+    }
+
+    const projected = projectTrendLine(
+      absoluteA,
+      candles[absoluteA].high,
+      absoluteB,
+      candles[absoluteB].high,
+      latestIndex,
+    );
+
+    return {
+      from: { time: candles[absoluteA].time, value: candles[absoluteA].high },
+      to: { time: candles[latestIndex].time, value: projected },
+      resistanceAtLatest: projected,
+    };
+  }
+
+  let bestMatch:
+    | {
+        absoluteA: number;
+        absoluteB: number;
+        projected: number;
+        penetrationCount: number;
+      }
+    | null = null;
+
+  for (let right = pivotIndexes.length - 1; right >= 1; right -= 1) {
+    for (let left = right - 1; left >= 0; left -= 1) {
+      const absoluteA = startIndex + pivotIndexes[left];
+      const absoluteB = startIndex + pivotIndexes[right];
+      const highA = candles[absoluteA].high;
+      const highB = candles[absoluteB].high;
+
+      if (highB >= highA) {
+        continue;
+      }
+
+      const projected = projectTrendLine(
+        absoluteA,
+        highA,
+        absoluteB,
+        highB,
+        latestIndex,
+      );
+      const tolerance = projected * 0.0035;
+      let penetrationCount = 0;
+
+      for (let index = absoluteA + 1; index < latestIndex; index += 1) {
+        const projectedAtIndex = projectTrendLine(
+          absoluteA,
+          highA,
+          absoluteB,
+          highB,
+          index,
+        );
+
+        if (candles[index].high > projectedAtIndex + tolerance) {
+          penetrationCount += 1;
+        }
+      }
+
+      if (penetrationCount > 1) {
+        continue;
+      }
+
+      bestMatch = {
+        absoluteA,
+        absoluteB,
+        projected,
+        penetrationCount,
+      };
+      break;
+    }
+
+    if (bestMatch) {
+      break;
+    }
+  }
+
+  if (!bestMatch) {
+    return null;
+  }
 
   return {
-    from: { time: candles[absoluteA].time, value: candles[absoluteA].high },
-    to: { time: candles[latestIndex].time, value: projected },
-    resistanceAtLatest: projected,
+    from: {
+      time: candles[bestMatch.absoluteA].time,
+      value: candles[bestMatch.absoluteA].high,
+    },
+    to: { time: candles[latestIndex].time, value: bestMatch.projected },
+    resistanceAtLatest: bestMatch.projected,
   };
 }
 
