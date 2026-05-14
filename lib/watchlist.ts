@@ -9,6 +9,10 @@ export const WATCHLIST_SYMBOLS = [
   "TSLA",
   "NVDA",
   "GOOGL",
+  "WMT",
+  "AMD",
+  "INTC",
+  "MU",
   "TNA",
   "BAC",
   "MRNA",
@@ -17,9 +21,7 @@ export const WATCHLIST_SYMBOLS = [
   "USO",
   "XOM",
   "CVX",
-  "DIS",
   "PYPL",
-  "CMG",
 ] as const;
 
 export const WATCHLIST_QUOTE_TTL_MS = 2 * 60 * 1000;

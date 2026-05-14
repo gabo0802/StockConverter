@@ -57,6 +57,49 @@ describe("strategy engine", () => {
     expect(response.strategies).toHaveLength(5);
   });
 
+  it("matches bearish channel when the latest candle breaks a recent descending ceiling", () => {
+    const { hourly, daily } = makeContextData({ hourly: makeSequence(700, 120, "up") });
+    const recentHighs = [
+      719.8, 718.1, 716.5, 715.9, 714.7, 713.9, 712.8, 711.6, 710.5, 709.7,
+      708.8, 707.9, 706.8, 705.9, 705.1,
+    ];
+
+    recentHighs.forEach((high, index) => {
+      const candleIndex = hourly.length - 16 + index;
+      hourly[candleIndex] = {
+        ...hourly[candleIndex],
+        open: high - 3.2,
+        high,
+        low: high - 5.4,
+        close: high - 2.2,
+        volume: 9_000_000 + index * 120_000,
+      };
+    });
+
+    hourly[hourly.length - 1] = {
+      ...hourly[hourly.length - 1],
+      time: new Date(Date.UTC(2026, 4, 12, 16, 0, 0)).toISOString(),
+      open: 703.3,
+      low: 702.4,
+      high: 708.2,
+      close: 707.4,
+      volume: 12_500_000,
+    };
+
+    const context = buildMarketContext({
+      symbol: "AMZN",
+      displayName: "Amazon.com, Inc.",
+      hourly,
+      daily,
+    });
+
+    const bearChannel = evaluateStrategies(context).find(
+      (strategy) => strategy.strategyId === "bear_channel",
+    );
+
+    expect(bearChannel?.matched).toBe(true);
+  });
+
   it("adds SPY-tuned warning for non-SPY symbols", () => {
     const response = buildAnalysisResponse({
       symbol: "QQQ",
