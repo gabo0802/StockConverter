@@ -3,7 +3,9 @@ export type StrategyId =
   | "bear_channel"
   | "regular_or_strong_drop"
   | "strong_floor"
-  | "first_gap_up";
+  | "first_gap_up"
+  | "put_first_red_10am"
+  | "put_bear_channel";
 
 export type CacheStatus = "fresh" | "cached" | "refreshed" | "error" | "not_analyzed";
 
