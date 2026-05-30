@@ -9,6 +9,8 @@ export const STRATEGY_LABELS: Record<StrategyId, string> = {
   regular_or_strong_drop: "Caida Regular/Fuerte",
   strong_floor: "Piso Fuerte",
   first_gap_up: "Primer Gap al Alza",
+  put_first_red_10am: "Primera Vela Roja 10am",
+  put_bear_channel: "PUT Canal Bajista",
 };
 
 export const DEFAULT_TICKER_PROFILE: TickerProfile = {

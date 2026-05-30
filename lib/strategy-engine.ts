@@ -12,6 +12,9 @@ import {
   getNewYorkHour,
   isBullishCandle,
   isHammerCandle,
+  isBearishCandle,
+  isBearishEngulfing,
+  findAscendingSupport,
   isNearLevel,
   projectTrendLine,
 } from "@/lib/indicators";
@@ -271,6 +274,91 @@ function evaluateFirstGapUp(context: MarketContext): StrategyEvaluation {
   };
 }
 
+function evaluatePutFirstRed10am(context: MarketContext): StrategyEvaluation {
+  const lastCandle = latest(context.hourly);
+  const ordered =
+    lastCandle.ma20 !== null &&
+    lastCandle.ma40 !== null &&
+    lastCandle.ma100 !== null &&
+    lastCandle.ma20 !== null && // Avoid unused variable, just strict check
+    lastCandle.ma20 < lastCandle.ma40 &&
+    lastCandle.ma40 < lastCandle.ma100;
+    
+  const expensiveZone =
+    lastCandle.ma40 !== null &&
+    (lastCandle.close > lastCandle.ma40 || isNearLevel(lastCandle.close, lastCandle.ma40, context.profile.nearMaTolerancePct));
+    
+  const is10am = getNewYorkHour(lastCandle.time) === 10;
+  
+  const supportLine = findAscendingSupport(context.hourly.slice(-14));
+  const breakoutDown = Boolean(supportLine) && isBearishCandle(lastCandle) && lastCandle.close < (supportLine?.supportAtLatest ?? 0);
+  
+  const elevatedVolume = lastCandle.volume >= context.averageHourlyVolume;
+  
+  const reasons = [
+    buildSignal("Bearish MA stack", ordered, ordered ? "20 < 40 < 100 on the latest hourly candle." : "Hourly moving averages are not in the required bearish order."),
+    buildSignal("Expensive zone / bounce fail", expensiveZone, expensiveZone ? "Price is near or above PM40, indicating a failed bounce attempt." : "Price is not high enough to be considered a rejection zone."),
+    buildSignal("Ascending line broken", breakoutDown, breakoutDown ? "The 10am red candle broke the recent ascending support line." : "No confirmed bearish break of the local ascending line."),
+    buildSignal("10 AM candle is red", is10am && isBearishCandle(lastCandle), is10am && isBearishCandle(lastCandle) ? "The 10 AM hourly candle closed strong red." : "The latest candle is not a strong red 10 AM candle."),
+    buildSignal("Elevated volume", elevatedVolume, elevatedVolume ? "Volume is above average." : "Volume is not above average."),
+  ];
+  
+  return {
+    strategyId: "put_first_red_10am",
+    strategyName: STRATEGY_LABELS.put_first_red_10am,
+    matched: reasons.every((reason) => reason.passed),
+    score: reasons.filter((reason) => reason.passed).length / reasons.length,
+    summary: reasons.every((reason) => reason.passed)
+      ? "The 10 AM candle rejected resistance and broke the local ascending support with high volume."
+      : "The 10 AM first red candle setup is incomplete or missing key rejection signs.",
+    reasonsPassed: reasons.filter((reason) => reason.passed),
+    reasonsFailed: reasons.filter((reason) => !reason.passed),
+    warnings: buildWarning(context.symbol),
+    annotations: [
+      ...(lastCandle.ma40 ? [createHorizontalLine("pm40", "PM40 zone", lastCandle.ma40, "#ef4444")] : []),
+      ...(supportLine ? [createTrendLine("put-10am-break", "Support break line", [supportLine.from, supportLine.to], "#b91c1c")] : []),
+      createMarker("put-10am-latest", "10am candle", { time: lastCandle.time, value: lastCandle.close }, "#eab308"),
+    ],
+  };
+}
+
+function evaluatePutBearChannel(context: MarketContext): StrategyEvaluation {
+  const line = findDescendingResistance(context.hourly);
+  const lastCandle = latest(context.hourly);
+  const previousCandle = context.hourly.length >= 2 ? context.hourly[context.hourly.length - 2] : null;
+  
+  const inExpensiveZone = Boolean(line) && lastCandle.close >= (line?.resistanceAtLatest ?? 0) * (1 - context.profile.nearMaTolerancePct);
+  const isEngulfing = Boolean(previousCandle) && isBearishEngulfing(previousCandle as EnrichedCandle, lastCandle);
+  
+  const supportLine = findAscendingSupport(context.hourly.slice(-14));
+  const breakoutDown = Boolean(supportLine) && lastCandle.close < (supportLine?.supportAtLatest ?? 0);
+  
+  const reasons = [
+    buildSignal("Descending channel exists", Boolean(line), line ? "Recent hourly highs form a downward ceiling." : "No clear descending channel was detected."),
+    buildSignal("In expensive zone (channel ceiling)", inExpensiveZone, inExpensiveZone ? "Price is near the top of the descending channel." : "Price is not near the channel's ceiling."),
+    buildSignal("Bounce attempt erased (Engulfing)", isEngulfing, isEngulfing ? "A bearish engulfing pattern erased the previous green bounce." : "No bearish engulfing pattern observed on the latest candles."),
+    buildSignal("Ascending floor broken", breakoutDown, breakoutDown ? "The red candle broke the local ascending support line." : "The red candle has not broken the recent ascending support line."),
+  ];
+  
+  return {
+    strategyId: "put_bear_channel",
+    strategyName: STRATEGY_LABELS.put_bear_channel,
+    matched: reasons.every((reason) => reason.passed),
+    score: reasons.filter((reason) => reason.passed).length / reasons.length,
+    summary: reasons.every((reason) => reason.passed)
+      ? "Price hit the descending channel ceiling, formed a bearish engulfing, and broke the ascending floor."
+      : "The canal bajista setup is incomplete (missing channel, engulfing, or support break).",
+    reasonsPassed: reasons.filter((reason) => reason.passed),
+    reasonsFailed: reasons.filter((reason) => !reason.passed),
+    warnings: buildWarning(context.symbol),
+    annotations: [
+      ...(line ? [createTrendLine("put-channel", "Channel ceiling", [line.from, line.to], "#f43f5e")] : []),
+      ...(supportLine ? [createTrendLine("put-channel-break", "Support break line", [supportLine.from, supportLine.to], "#9f1239")] : []),
+      createMarker("put-channel-latest", "Engulfing candle", { time: lastCandle.time, value: lastCandle.close }, "#eab308"),
+    ],
+  };
+}
+
 export function buildMarketContext(input: {
   symbol: string;
   displayName: string;
@@ -295,6 +383,8 @@ export function evaluateStrategies(context: MarketContext): StrategyEvaluation[]
     evaluateRegularOrStrongDrop(context),
     evaluatePm40Hour(context),
     evaluateBearChannel(context),
+    evaluatePutFirstRed10am(context),
+    evaluatePutBearChannel(context),
   ];
 }
 
